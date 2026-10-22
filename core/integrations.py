@@ -251,15 +251,30 @@ class IntegrationManager:
     """Manages company-specific integration configurations stored securely in the database."""
 
     def get_integration_record(self, company_id: str, integration_type: str) -> Optional[Dict[str, Any]]:
+        from core.knowledge_base import is_postgres
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT company_id, integration_type, provider, config_json, is_active, updated_at FROM integrations WHERE company_id = ? AND integration_type = ?",
-                (company_id, integration_type)
-            )
-            row = cursor.fetchone()
-            if row:
-                return dict(row)
+            if is_postgres():
+                cursor.execute(
+                    "SELECT company_id, integration_type, provider, config, is_active, updated_at FROM integrations WHERE company_id = ? AND integration_type = ?",
+                    (company_id, integration_type)
+                )
+                row = cursor.fetchone()
+                if row:
+                    data = dict(row)
+                    if "config" in data and not isinstance(data["config"], str):
+                        data["config_json"] = json.dumps(data["config"])
+                    else:
+                        data["config_json"] = str(data.get("config", "{}"))
+                    return data
+            else:
+                cursor.execute(
+                    "SELECT company_id, integration_type, provider, config_json, is_active, updated_at FROM integrations WHERE company_id = ? AND integration_type = ?",
+                    (company_id, integration_type)
+                )
+                row = cursor.fetchone()
+                if row:
+                    return dict(row)
             return None
 
     def save_integration_config(
@@ -270,20 +285,34 @@ class IntegrationManager:
         config: Dict[str, Any],
         is_active: bool = True
     ):
+        from core.knowledge_base import is_postgres
         now = datetime.datetime.now().isoformat()
         config_json = json.dumps(config)
+        rec_id = f"{company_id}_{integration_type}"
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                """INSERT INTO integrations (company_id, integration_type, provider, config_json, is_active, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?)
-                   ON CONFLICT(company_id, integration_type) DO UPDATE SET
-                   provider = excluded.provider,
-                   config_json = excluded.config_json,
-                   is_active = excluded.is_active,
-                   updated_at = excluded.updated_at""",
-                (company_id, integration_type, provider, config_json, 1 if is_active else 0, now)
-            )
+            if is_postgres():
+                cursor.execute(
+                    """INSERT INTO integrations (id, company_id, integration_type, provider, config, is_active, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)
+                       ON CONFLICT(id) DO UPDATE SET
+                       provider = excluded.provider,
+                       config = excluded.config,
+                       is_active = excluded.is_active,
+                       updated_at = excluded.updated_at""",
+                    (rec_id, company_id, integration_type, provider, config_json, is_active, now)
+                )
+            else:
+                cursor.execute(
+                    """INSERT INTO integrations (company_id, integration_type, provider, config_json, is_active, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?)
+                       ON CONFLICT(company_id, integration_type) DO UPDATE SET
+                       provider = excluded.provider,
+                       config_json = excluded.config_json,
+                       is_active = excluded.is_active,
+                       updated_at = excluded.updated_at""",
+                    (company_id, integration_type, provider, config_json, 1 if is_active else 0, now)
+                )
             conn.commit()
 
     def get_ecommerce_adapter(self, company_id: str) -> BaseECommerceAdapter:

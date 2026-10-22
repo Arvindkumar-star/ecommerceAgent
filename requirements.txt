@@ -11,3 +11,5 @@ python-multipart
 pypdf
 python-docx
 pytest
+psycopg2-binary
+supabase

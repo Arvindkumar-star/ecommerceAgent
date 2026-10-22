@@ -31,13 +31,21 @@ class PlatformMetrics:
         log_id = str(uuid.uuid4())
         tools_json = json.dumps(tools_used)
 
+        from core.knowledge_base import is_postgres
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                """INSERT INTO metrics (id, company_id, query, from_cache, total_latency, steps, tools_used, error, timestamp)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (log_id, company_id, query, 1 if from_cache else 0, total_latency, steps, tools_json, error, now)
-            )
+            if is_postgres():
+                cursor.execute(
+                    """INSERT INTO metrics (company_id, query, from_cache, total_latency, steps, tools_used, error, timestamp)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (company_id, query, True if from_cache else False, total_latency, steps, tools_json, error, now)
+                )
+            else:
+                cursor.execute(
+                    """INSERT INTO metrics (id, company_id, query, from_cache, total_latency, steps, tools_used, error, timestamp)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (log_id, company_id, query, 1 if from_cache else 0, total_latency, steps, tools_json, error, now)
+                )
             conn.commit()
 
     def get_summary(self, company_id: str) -> Dict[str, Any]:

@@ -30,19 +30,83 @@ DB_PATH = os.path.join(DATA_DIR, "support_platform.db")
 
 import contextlib
 
+def is_postgres() -> bool:
+    """Returns True if DATABASE_URL is configured for PostgreSQL / Supabase."""
+    db_url = os.getenv("DATABASE_URL")
+    return bool(db_url and (db_url.startswith("postgresql://") or db_url.startswith("postgres://")))
+
+
+class PostgresCursorWrapper:
+    """Wraps a psycopg2 cursor so that standard '?' placeholders are translated to '%s'."""
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    def execute(self, query, params=None):
+        if params is not None:
+            query = query.replace('?', '%s')
+            return self._cursor.execute(query, params)
+        return self._cursor.execute(query)
+
+    def fetchone(self):
+        return self._cursor.fetchone()
+
+    def fetchall(self):
+        return self._cursor.fetchall()
+
+    def __getattr__(self, name):
+        return getattr(self._cursor, name)
+
+
+class PostgresConnectionWrapper:
+    """Wraps a psycopg2 connection to provide dictionary-like row access."""
+    def __init__(self, conn):
+        self._conn = conn
+
+    def cursor(self):
+        import psycopg2.extras
+        cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        return PostgresCursorWrapper(cur)
+
+    def commit(self):
+        self._conn.commit()
+
+    def rollback(self):
+        self._conn.rollback()
+
+    def close(self):
+        self._conn.close()
+
+
 @contextlib.contextmanager
 def get_db_connection():
-    """Creates a thread-safe connection to the SQLite database and ensures closure."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    try:
-        yield conn
-    finally:
-        conn.close()
+    """
+    Creates a thread-safe connection to either Supabase PostgreSQL (if DATABASE_URL is set)
+    or local SQLite (if DATABASE_URL is unset).
+    """
+    if is_postgres():
+        import psycopg2
+        db_url = os.getenv("DATABASE_URL")
+        conn = psycopg2.connect(db_url)
+        wrapped = PostgresConnectionWrapper(conn)
+        try:
+            yield wrapped
+        finally:
+            conn.close()
+    else:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        try:
+            yield conn
+        finally:
+            conn.close()
 
 
 def init_db():
-    """Initializes tables for companies, documents, chunks, integrations, and metrics."""
+    """Initializes tables for local SQLite development. (Supabase tables are initialized via migration)."""
+    if is_postgres():
+        logger.info("Connected to Supabase PostgreSQL cloud database.")
+        return
+
     with get_db_connection() as conn:
         cursor = conn.cursor()
         
@@ -63,7 +127,7 @@ def init_db():
                 filename TEXT NOT NULL,
                 file_type TEXT NOT NULL,
                 file_size INTEGER NOT NULL,
-                status TEXT NOT NULL, -- 'indexed', 'failed', 'processing'
+                status TEXT NOT NULL,
                 chunk_count INTEGER DEFAULT 0,
                 error_message TEXT,
                 created_at TEXT NOT NULL,
@@ -94,8 +158,8 @@ def init_db():
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS integrations (
                 company_id TEXT NOT NULL,
-                integration_type TEXT NOT NULL, -- 'ecommerce', 'inventory'
-                provider TEXT NOT NULL, -- 'rest_api', 'database', 'shopify', 'unconfigured'
+                integration_type TEXT NOT NULL,
+                provider TEXT NOT NULL,
                 config_json TEXT NOT NULL,
                 is_active INTEGER DEFAULT 0,
                 updated_at TEXT NOT NULL,
@@ -122,7 +186,6 @@ def init_db():
         conn.commit()
 
 
-# Initialize database on module load
 init_db()
 
 
@@ -388,14 +451,40 @@ class MultiTenantKnowledgeBase:
 
             for chunk_data, emb in zip(chunks, embeddings):
                 chunk_id = str(uuid.uuid4())
-                emb_blob = emb.astype(np.float32).tobytes()
-                cursor.execute(
-                    """INSERT INTO chunks (id, company_id, document_id, filename, page_number, location, content, embedding, created_at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (chunk_id, company_id, document_id, filename, chunk_data["page_number"],
-                     chunk_data["location"], chunk_data["content"], emb_blob, now)
-                )
+                if is_postgres():
+                    emb_str = f"[{','.join(map(str, emb.tolist()))}]"
+                    cursor.execute(
+                        """INSERT INTO chunks (id, company_id, document_id, filename, page_number, location, content, embedding, created_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?::vector, ?)""",
+                        (chunk_id, company_id, document_id, filename, chunk_data["page_number"],
+                         chunk_data["location"], chunk_data["content"], emb_str, now)
+                    )
+                else:
+                    emb_blob = emb.astype(np.float32).tobytes()
+                    cursor.execute(
+                        """INSERT INTO chunks (id, company_id, document_id, filename, page_number, location, content, embedding, created_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (chunk_id, company_id, document_id, filename, chunk_data["page_number"],
+                         chunk_data["location"], chunk_data["content"], emb_blob, now)
+                    )
             conn.commit()
+
+        # Upload raw document to Supabase Storage if configured
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        if supabase_url and supabase_key:
+            try:
+                from supabase import create_client
+                client = create_client(supabase_url, supabase_key)
+                storage_path = f"{company_id}/{document_id}/{filename}"
+                client.storage.from_("documents").upload(
+                    path=storage_path,
+                    file=file_bytes,
+                    file_options={"content-type": "application/octet-stream", "upsert": "true"}
+                )
+                logger.info(f"Stored original document in Supabase Storage: {storage_path}")
+            except Exception as se:
+                logger.warning(f"Could not upload to Supabase storage (proceeding with vector DB): {se}")
 
         logger.info(f"Successfully indexed document {filename} ({len(chunks)} chunks) for company {company_id}")
         return {
@@ -446,8 +535,7 @@ class MultiTenantKnowledgeBase:
     ) -> Dict[str, Any]:
         """
         Retrieves relevant chunks strictly from the specified company's indexed documents.
-        Filters by company_id on backend; calculates cosine similarity.
-        Returns actual retrieved text, document filename, page/location, and score.
+        Uses native pgvector cosine search in Supabase or in-memory NumPy fallback.
         """
         if not company_id:
             return {
@@ -457,6 +545,56 @@ class MultiTenantKnowledgeBase:
                 "chunks": [],
                 "count": 0,
                 "error": "company_id is required for retrieval."
+            }
+
+        # Native Supabase pgvector execution
+        if is_postgres():
+            try:
+                q_vec = self.embedding_service.embed_text(query)
+            except Exception as e:
+                return {
+                    "source": "knowledge_base",
+                    "company_id": company_id,
+                    "query": query,
+                    "chunks": [],
+                    "count": 0,
+                    "error": f"Failed to generate query embedding: {str(e)}"
+                }
+
+            q_vec_str = f"[{','.join(map(str, q_vec.tolist()))}]"
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """SELECT id, document_id, filename, page_number, location, content,
+                              1 - (embedding <=> ?::vector) AS score
+                       FROM chunks
+                       WHERE company_id = ?
+                       ORDER BY embedding <=> ?::vector ASC
+                       LIMIT ?""",
+                    (q_vec_str, company_id, q_vec_str, top_k)
+                )
+                rows = cursor.fetchall()
+
+            chunks = []
+            for r in rows:
+                score = float(r["score"]) if r["score"] is not None else 0.0
+                if score >= similarity_threshold:
+                    chunks.append({
+                        "chunk_id": r["id"],
+                        "document_id": r["document_id"],
+                        "filename": r["filename"],
+                        "page_number": r["page_number"],
+                        "location": r["location"],
+                        "content": r["content"],
+                        "score": round(score, 4)
+                    })
+
+            return {
+                "source": "knowledge_base",
+                "company_id": company_id,
+                "query": query,
+                "chunks": chunks,
+                "count": len(chunks)
             }
 
         with get_db_connection() as conn:
