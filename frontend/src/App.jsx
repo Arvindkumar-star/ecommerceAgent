@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import FormattedMessage from './FormattedMessage';
 
-// API Base URL (Relative for proxy/production or local backend)
-const API_BASE = '';
+// API Base URL (Configurable via environment variable for Vercel/production or relative for local backend)
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('chat');
