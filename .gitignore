@@ -1,0 +1,27 @@
+# Environment secrets (NEVER COMMIT)
+.env
+*.env
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Local databases and caches
+data/*.db
+data/*.db-journal
+*.sqlite3
+
+# Node & Frontend dependencies and builds
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+
+# Operating system and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
