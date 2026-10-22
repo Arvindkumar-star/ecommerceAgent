@@ -6,6 +6,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('chat');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [companies, setCompanies] = useState([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState('');
   const [companyModalOpen, setCompanyModalOpen] = useState(false);
@@ -13,6 +14,11 @@ export default function App() {
   const [newCompanyId, setNewCompanyId] = useState('');
   const [newCompanyName, setNewCompanyName] = useState('');
   const tenantDropdownRef = useRef(null);
+
+  const handleNav = (tabKey) => {
+    setActiveTab(tabKey);
+    setMobileMenuOpen(false);
+  };
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -121,36 +127,42 @@ export default function App() {
     <div className="app-layout">
       {/* Toast Alert */}
       {toast && (
-        <div style={{
-          position: 'fixed',
-          top: 20,
-          right: 20,
-          zIndex: 1000,
-          padding: '12px 18px',
-          borderRadius: 8,
-          background: toast.type === 'error' ? '#f43f5e' : toast.type === 'success' ? '#10b981' : '#6366f1',
-          color: 'white',
-          fontWeight: 600,
-          fontSize: 13,
-          boxShadow: '0 8px 20px rgba(0,0,0,0.4)',
-          animation: 'fadeIn 0.2s ease-out'
-        }}>
+        <div className={`app-toast toast-${toast.type || 'info'}`}>
           {toast.message}
         </div>
       )}
 
+      {/* Mobile Drawer Backdrop */}
+      {mobileMenuOpen && (
+        <div 
+          className="sidebar-backdrop" 
+          onClick={() => setMobileMenuOpen(false)} 
+          aria-hidden="true"
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
         <div className="sidebar-header">
-          <div className="brand-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-            </svg>
+          <div className="brand-header-content">
+            <div className="brand-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+              </svg>
+            </div>
+            <div className="brand-info">
+              <h2>NexusCX AI</h2>
+              <span>Enterprise Support & RAG</span>
+            </div>
           </div>
-          <div className="brand-info">
-            <h2>NexusCX AI</h2>
-            <span>Enterprise Support & RAG</span>
-          </div>
+          <button 
+            type="button"
+            className="sidebar-close-btn"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-label="Close navigation"
+          >
+            ✕
+          </button>
         </div>
 
         {/* Modern Workspace / Tenant Switcher */}
@@ -158,7 +170,10 @@ export default function App() {
           <div className="company-selector-label">
             <span>Workspace</span>
             <button 
-              onClick={() => setCompanyModalOpen(true)}
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setCompanyModalOpen(true);
+              }}
               className="btn-add-tenant"
               title="Add New Workspace"
             >
@@ -241,6 +256,7 @@ export default function App() {
                     className="tenant-menu-create-btn"
                     onClick={() => {
                       setTenantDropdownOpen(false);
+                      setMobileMenuOpen(false);
                       setCompanyModalOpen(true);
                     }}
                   >
@@ -256,7 +272,7 @@ export default function App() {
         <nav className="sidebar-nav">
           <div 
             className={`nav-item ${activeTab === 'overview' ? 'active' : ''}`}
-            onClick={() => setActiveTab('overview')}
+            onClick={() => handleNav('overview')}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
             Overview
@@ -264,7 +280,7 @@ export default function App() {
 
           <div 
             className={`nav-item ${activeTab === 'chat' ? 'active' : ''}`}
-            onClick={() => setActiveTab('chat')}
+            onClick={() => handleNav('chat')}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             AI Support Chat
@@ -272,7 +288,7 @@ export default function App() {
 
           <div 
             className={`nav-item ${activeTab === 'kb' ? 'active' : ''}`}
-            onClick={() => setActiveTab('kb')}
+            onClick={() => handleNav('kb')}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10M6 10h10"/></svg>
             Knowledge Base
@@ -280,7 +296,7 @@ export default function App() {
 
           <div 
             className={`nav-item ${activeTab === 'orders' ? 'active' : ''}`}
-            onClick={() => setActiveTab('orders')}
+            onClick={() => handleNav('orders')}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/></svg>
             Orders & Inventory
@@ -288,7 +304,7 @@ export default function App() {
 
           <div 
             className={`nav-item ${activeTab === 'analytics' ? 'active' : ''}`}
-            onClick={() => setActiveTab('analytics')}
+            onClick={() => handleNav('analytics')}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
             Analytics
@@ -296,7 +312,7 @@ export default function App() {
 
           <div 
             className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => setActiveTab('settings')}
+            onClick={() => handleNav('settings')}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
             Settings & Integrations
@@ -315,17 +331,34 @@ export default function App() {
       {/* Main Content Area */}
       <main className="main-wrapper">
         <header className="main-topbar">
-          <div className="topbar-title">
-            <h1>{tabTitles[activeTab]}</h1>
-            <span className="topbar-badge">{selectedCompanyId || 'Select Company'}</span>
+          <div className="topbar-left">
+            <button 
+              type="button"
+              className="mobile-menu-btn" 
+              onClick={() => setMobileMenuOpen(true)}
+              aria-label="Open navigation menu"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
+            </button>
+            <div className="topbar-title">
+              <h1>{tabTitles[activeTab]}</h1>
+              <span className="topbar-badge" title={selectedCompanyId}>{selectedCompanyId || 'Select Company'}</span>
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <span style={{ fontSize: 12, color: '#94a3b8' }}>Grounded AI Agent</span>
+          <div className="topbar-right">
+            <span className="grounded-status-tag">
+              <span className="grounded-dot"></span>
+              <span className="grounded-label">Grounded AI</span>
+            </span>
           </div>
         </header>
 
         <div className="main-content">
-          {activeTab === 'overview' && <OverviewView companyId={selectedCompanyId} onNavigate={setActiveTab} />}
+          {activeTab === 'overview' && <OverviewView companyId={selectedCompanyId} onNavigate={handleNav} />}
           {activeTab === 'chat' && (
             <ChatView 
               companyId={selectedCompanyId} 
@@ -334,10 +367,58 @@ export default function App() {
             />
           )}
           {activeTab === 'kb' && <KnowledgeBaseView companyId={selectedCompanyId} showToast={showToast} />}
-          {activeTab === 'orders' && <OrdersInventoryView companyId={selectedCompanyId} onNavigate={setActiveTab} />}
+          {activeTab === 'orders' && <OrdersInventoryView companyId={selectedCompanyId} onNavigate={handleNav} />}
           {activeTab === 'analytics' && <AnalyticsView companyId={selectedCompanyId} />}
           {activeTab === 'settings' && <SettingsView companyId={selectedCompanyId} showToast={showToast} />}
         </div>
+
+        {/* Mobile Bottom Navigation Bar */}
+        <nav className="mobile-bottom-nav" aria-label="Mobile Navigation">
+          <button 
+            type="button" 
+            className={`mobile-nav-btn ${activeTab === 'chat' ? 'active' : ''}`}
+            onClick={() => handleNav('chat')}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span>Chat</span>
+          </button>
+
+          <button 
+            type="button" 
+            className={`mobile-nav-btn ${activeTab === 'overview' ? 'active' : ''}`}
+            onClick={() => handleNav('overview')}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+            <span>Overview</span>
+          </button>
+
+          <button 
+            type="button" 
+            className={`mobile-nav-btn ${activeTab === 'kb' ? 'active' : ''}`}
+            onClick={() => handleNav('kb')}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10M6 10h10"/></svg>
+            <span>Docs</span>
+          </button>
+
+          <button 
+            type="button" 
+            className={`mobile-nav-btn ${activeTab === 'orders' ? 'active' : ''}`}
+            onClick={() => handleNav('orders')}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/></svg>
+            <span>Orders</span>
+          </button>
+
+          <button 
+            type="button" 
+            className={`mobile-nav-btn ${mobileMenuOpen || ['analytics', 'settings'].includes(activeTab) ? 'active' : ''}`}
+            onClick={() => setMobileMenuOpen(true)}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+            <span>Menu</span>
+          </button>
+        </nav>
       </main>
 
       {/* New Company Modal */}
@@ -476,7 +557,7 @@ function OverviewView({ companyId, onNavigate }) {
       </div>
 
       {/* Quick Action Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
+      <div className="grid-two-col">
         <div className="content-card" style={{ marginBottom: 0 }}>
           <h3 className="content-card-title">Knowledge Base Grounding</h3>
           <p className="content-card-desc">Upload company return policies, warranties, shipping guidelines, and product catalogues in PDF, DOCX, TXT, or CSV.</p>
@@ -669,17 +750,17 @@ function ChatView({ companyId, companyName, showToast }) {
       {/* Customer Auth Simulation Bar */}
       <div className="chat-auth-header">
         <div className="chat-auth-input-group">
-          <span style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', whiteSpace: 'nowrap' }}>Customer ID:</span>
+          <span className="chat-auth-label">Customer ID:</span>
           <input 
             type="text"
             className="chat-auth-input"
-            placeholder="e.g. john@example.com (Optional for auth lookups)"
+            placeholder="e.g. john@example.com (Optional)"
             value={customerId}
             onChange={(e) => setCustomerId(e.target.value)}
           />
         </div>
         <button 
-          className="btn btn-secondary btn-sm"
+          className="btn btn-secondary btn-sm chat-clear-btn"
           onClick={() => setMessages([{
             role: 'assistant',
             content: `Conversation reset for ${companyId}. Ask any policy or order question.`,
@@ -777,7 +858,7 @@ function ChatView({ companyId, companyName, showToast }) {
       <div className="chat-input-area">
         <textarea 
           className="chat-textarea"
-          placeholder="Ask a customer support question (Enter to send, Shift+Enter for new line)..."
+          placeholder="Ask support a question (e.g. return policy, order status)..."
           value={inputQuery}
           onChange={(e) => setInputQuery(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -1073,7 +1154,7 @@ function OrdersInventoryView({ companyId, onNavigate }) {
   return (
     <div>
       {/* Integration Status Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
+      <div className="grid-two-col">
         <div className="content-card" style={{ marginBottom: 0 }}>
           <div className="content-card-header">
             <div>
@@ -1124,7 +1205,7 @@ function OrdersInventoryView({ companyId, onNavigate }) {
         <h3 className="content-card-title">Live System Query Verifier</h3>
         <p className="content-card-desc">Test how the agent interacts with live integrations or reports unconfigured statuses truthfully.</p>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginTop: 20 }}>
+        <div className="grid-two-col" style={{ marginTop: 20 }}>
           {/* Order Test Box */}
           <div style={{ background: '#101827', padding: 18, borderRadius: 10, border: '1px solid #1e2c44' }}>
             <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Test Order Lookup</h4>
@@ -1440,7 +1521,7 @@ function SettingsView({ companyId, showToast }) {
       <div className="content-card">
         <h3 className="content-card-title">AI Engine & Model Architecture</h3>
         <p className="content-card-desc">Grounded agent settings and safety parameters.</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginTop: 16 }}>
+        <div className="model-arch-grid" style={{ marginTop: 16 }}>
           <div style={{ background: '#101827', padding: 14, borderRadius: 8, border: '1px solid #1e2c44' }}>
             <span style={{ fontSize: 12, color: '#94a3b8' }}>LLM Model</span>
             <div style={{ fontWeight: 600, color: '#fff', marginTop: 4 }}>Gemini 3.5 Flash</div>
