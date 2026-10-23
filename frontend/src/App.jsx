@@ -643,7 +643,7 @@ function ChatView({ companyId, companyName, showToast }) {
   ]);
   const [loading, setLoading] = useState(false);
   const [expandedSources, setExpandedSources] = useState({});
-  const messagesEndRef = useRef(null);
+  const chatMessagesRef = useRef(null);
   const textareaRef = useRef(null);
 
   // Auto-resize textarea smoothly as user types (min 42px, max 120px)
@@ -671,7 +671,12 @@ function ChatView({ companyId, companyName, showToast }) {
   }, [companyId, companyName]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (chatMessagesRef.current) {
+      chatMessagesRef.current.scrollTo({
+        top: chatMessagesRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
   };
 
   useEffect(() => {
@@ -789,7 +794,7 @@ function ChatView({ companyId, companyName, showToast }) {
       </div>
 
       {/* Messages Scroll Area */}
-      <div className="chat-messages">
+      <div className="chat-messages" ref={chatMessagesRef}>
         {messages.map((m, idx) => (
           <div key={idx} className={`message-row ${m.role}`}>
             <div className={`message-avatar ${m.role === 'user' ? 'avatar-user' : 'avatar-assistant'}`}>
@@ -855,7 +860,6 @@ function ChatView({ companyId, companyName, showToast }) {
             </div>
           </div>
         )}
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Suggested Questions */}
