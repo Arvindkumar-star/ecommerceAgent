@@ -357,7 +357,7 @@ export default function App() {
           </div>
         </header>
 
-        <div className="main-content">
+        <div className={`main-content ${activeTab === 'chat' ? 'main-content-chat' : ''}`}>
           {activeTab === 'overview' && <OverviewView companyId={selectedCompanyId} onNavigate={handleNav} />}
           {activeTab === 'chat' && (
             <ChatView 
@@ -644,6 +644,15 @@ function ChatView({ companyId, companyName, showToast }) {
   const [loading, setLoading] = useState(false);
   const [expandedSources, setExpandedSources] = useState({});
   const messagesEndRef = useRef(null);
+  const textareaRef = useRef(null);
+
+  // Auto-resize textarea smoothly as user types (min 42px, max 120px)
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+    }
+  }, [inputQuery]);
 
   // Sync greeting when company changes if user hasn't chatted yet
   useEffect(() => {
@@ -676,6 +685,9 @@ function ChatView({ companyId, companyName, showToast }) {
     const userMessage = { role: 'user', content: q.trim() };
     setMessages((prev) => [...prev, userMessage]);
     setInputQuery('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
     setLoading(true);
 
     try {
@@ -754,7 +766,7 @@ function ChatView({ companyId, companyName, showToast }) {
           <input 
             type="text"
             className="chat-auth-input"
-            placeholder="e.g. john@example.com (Optional)"
+            placeholder="Customer ID (optional)"
             value={customerId}
             onChange={(e) => setCustomerId(e.target.value)}
           />
@@ -763,11 +775,16 @@ function ChatView({ companyId, companyName, showToast }) {
           className="btn btn-secondary btn-sm chat-clear-btn"
           onClick={() => setMessages([{
             role: 'assistant',
-            content: `Conversation reset for ${companyId}. Ask any policy or order question.`,
+            content: `Conversation reset for ${companyName || companyId}. Ask any policy or order question.`,
             sources: []
           }])}
+          title="Reset conversation"
         >
-          Clear Chat
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+            <path d="M3 3v5h5"/>
+          </svg>
+          <span>Clear</span>
         </button>
       </div>
 
@@ -778,7 +795,7 @@ function ChatView({ companyId, companyName, showToast }) {
             <div className={`message-avatar ${m.role === 'user' ? 'avatar-user' : 'avatar-assistant'}`}>
               {m.role === 'user' ? 'U' : 'AI'}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
               <div className="message-bubble">
                 <FormattedMessage content={m.content} isUser={m.role === 'user'} />
 
@@ -857,20 +874,25 @@ function ChatView({ companyId, companyName, showToast }) {
       {/* Input Box */}
       <div className="chat-input-area">
         <textarea 
+          ref={textareaRef}
           className="chat-textarea"
-          placeholder="Ask support a question (e.g. return policy, order status)..."
+          placeholder="Ask support a question..."
           value={inputQuery}
           onChange={(e) => setInputQuery(e.target.value)}
           onKeyDown={handleKeyDown}
           rows={1}
         />
         <button 
-          className="btn btn-primary"
+          className="btn btn-primary chat-send-btn"
           onClick={() => handleSend()}
           disabled={loading || !inputQuery.trim()}
-          style={{ height: 44, padding: '0 20px' }}
+          aria-label="Send message"
         >
-          Send
+          <span>Send</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
         </button>
       </div>
     </div>
